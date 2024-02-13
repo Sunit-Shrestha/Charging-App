@@ -1,9 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, memo } from "react";
 
 let map;
 let location = navigator.geolocation;
-let stations = [];
-let phoneNumbers = [];
+let selfMarker;
+let stationMarkers = [];
+
+//Returns marker icon with specified color
 function getMarker(color = "blue") {
 	color = color.toLowerCase();
 	var customMarker = new L.Icon({
@@ -18,45 +20,64 @@ function getMarker(color = "blue") {
 	return customMarker;
 }
 
-function Map() {
-	const [pos, setPos] = useState(null);
-	function updateLocations() {
+//Updates the position marker
+function updatePosition(latitude, longitude) {
+	selfMarker = L.marker([latitude, longitude], {
+		icon: getMarker("green"),
+	});
+	selfMarker.addTo(map);
+}
+
+//Loads the map centered at the specified latitude and longitude
+function initializeMap(latitude, longitude) {
+	map.setView([latitude, longitude], 14);
+	L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+		maxZoom: 19,
+		attribution:
+			'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+	}).addTo(map);
+	L.control
+		.zoom({
+			position: "bottomright",
+		})
+		.addTo(map);
+	updatePosition(latitude, longitude);
+}
+
+function Map(props) {
+	//Creates the map, initializes it using gps location and updates the current position at an interval
+	useEffect(() => {
+		map = L.map("map", {
+			zoomControl: false,
+		});
 		location.getCurrentPosition(
 			(position) =>
-				setPos([position.coords.latitude, position.coords.longitude]),
-			() => setPos([27.6822, 85.323816])
+				initializeMap(position.coords.latitude, position.coords.longitude),
+			() => initializeMap(27.672, 85.323816)
 		);
-
-		//get stations from server
-		stations = [
-			[27.68, 85.323816],
-			[27.672, 85.349],
-		];
-		phoneNumbers = ["1234567890", "0987654321"];
-	}
-
-	useEffect(() => {
-		map = L.map("map");
-		updateLocations();
-		setInterval(updateLocations, 10000);
+		setInterval(() => {
+			location.getCurrentPosition((position) => {
+				map.removeLayer(selfMarker);
+				updatePosition(position.coords.latitude, position.coords.longitude);
+			});
+		}, 10000);
 	}, []);
 
-	if (map != null) {
-		map.setView(pos, 14);
-		L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-			maxZoom: 19,
-			attribution:
-				'&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-		}).addTo(map);
-		L.marker(pos, { icon: getMarker("green") }).addTo(map);
+	//Plots the station markers on the map. Removes and re-adds the markers on every re-render
+	useEffect(() => {
+		for (let marker of stationMarkers) {
+			map.removeLayer(marker);
+		}
 
-		for (let idx in stations) {
-			let marker = L.marker(stations[idx], { icon: getMarker() }).addTo(map);
+		for (let station of props.stations) {
+			let marker = L.marker(station, { icon: getMarker() }).addTo(map);
 			marker.on("click", function (e) {
-				alert(`Station Number ${idx + 1}: ${phoneNumbers[idx]}`);
+				alert(`Station Number ...`);
 			});
 		}
-	}
+	});
+
+	console.log("Map rendered");
 
 	return (
 		<>
@@ -65,4 +86,4 @@ function Map() {
 	);
 }
 
-export default Map;
+export default memo(Map);
